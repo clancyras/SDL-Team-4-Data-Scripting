@@ -1,3 +1,4 @@
 datasets*
 images*
 .conda
+models/hold

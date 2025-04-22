@@ -8,48 +8,108 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
 
+# class LoanDefaultPredictor(nn.Module):
+#     def __init__(self, input_size):
+#         super(LoanDefaultPredictor, self).__init__()
+        
+#         self.fc1 = nn.Linear(input_size, 32)
+#         self.bn1 = nn.BatchNorm1d(32)  # Normalization
+#         self.relu = nn.ReLU()
+#         self.dropout1 = nn.Dropout(0.3)  # prevent overfitting
+
+#         self.fc3 = nn.Linear(32, 1)  # Single output
+
+#     def forward(self, x):
+#         x = self.fc1(x)
+#         x = self.bn1(x)
+#         x = self.relu(x)
+#         x = self.dropout1(x)
+        
+#         x = self.fc3(x) 
+#         return x
 class LoanDefaultPredictor(nn.Module):
     def __init__(self, input_size):
         super(LoanDefaultPredictor, self).__init__()
-        
-        self.fc1 = nn.Linear(input_size, 32)
-        self.bn1 = nn.BatchNorm1d(32)  # Normalization
-        self.relu = nn.ReLU()
-        self.dropout1 = nn.Dropout(0.3)  # prevent overfitting
-
-        self.fc3 = nn.Linear(32, 1)  # Single output
+        self.net = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1)  # Binary classification output
+        )
 
     def forward(self, x):
-        x = self.fc1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.dropout1(x)
-        
-        x = self.fc3(x) 
-        return x  
+        return self.net(x)
 
 
-def train_model(model, feature_vectors, target_values, epochs=100, batch_size=16):
+
+
+
+# import time
+# def train_model(model, feature_vectors, target_values, epochs=5, batch_size=512):
+#     # Convert data to PyTorch tensors
+#     x_train = torch.tensor(feature_vectors, dtype=torch.float32)
+#     y_train = torch.tensor(target_values, dtype=torch.float32).unsqueeze(1)
+
+#     class_counts = np.bincount(target_values.astype(int))
+
+#     if class_counts[0] == 0:
+#         pos_weight_value = 1.0  
+#     else:
+#         pos_weight_value = min(class_counts[1] / class_counts[0], 5.0)
+
+#     # pos_weight = torch.tensor([5.0]).to(torch.device('cpu'))
+#     pos_weight = torch.tensor([min(class_counts[0] / class_counts[1], 20.0)])
+
+
+#     dataset = TensorDataset(x_train, y_train)
+#     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+#     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+#     optimizer = optim.Adam(model.parameters(), lr=0.0005)
+
+#     # Training Loop
+#     for epoch in range(epochs):
+#         total_loss = 0.0
+#         for inputs, labels in dataloader:
+#             optimizer.zero_grad()
+#             outputs = model(inputs)
+#             loss = criterion(outputs, labels)
+#             loss.backward()
+#             optimizer.step()
+#             total_loss += loss.item()
+
+#         if epoch % 10 == 0:
+#             print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss}")
+
+#     return model
+
+
+import torch
+from torch import nn, optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+
+def train_model(model, feature_vectors, target_values, epochs=50, batch_size=512):
     # Convert data to PyTorch tensors
     x_train = torch.tensor(feature_vectors, dtype=torch.float32)
     y_train = torch.tensor(target_values, dtype=torch.float32).unsqueeze(1)
 
+    # Calculate class balance
     class_counts = np.bincount(target_values.astype(int))
+    ratio = class_counts[0] / class_counts[1] if class_counts[1] != 0 else 1.0
+    pos_weight = torch.tensor([min(ratio, 20.0)])  # Cap to prevent instability
 
-    if class_counts[0] == 0:
-        pos_weight_value = 1.0  
-    else:
-        pos_weight_value = min(class_counts[1] / class_counts[0], 5.0)
-
-    pos_weight = torch.tensor([pos_weight_value], dtype=torch.float32)
-
+    # Dataloader setup
     dataset = TensorDataset(x_train, y_train)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+    # Loss and optimizer
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
 
-    # Training Loop
+    # Training loop
     for epoch in range(epochs):
         total_loss = 0.0
         for inputs, labels in dataloader:
@@ -60,32 +120,38 @@ def train_model(model, feature_vectors, target_values, epochs=100, batch_size=16
             optimizer.step()
             total_loss += loss.item()
 
-        if epoch % 10 == 0:
-            print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss}")
+        if epoch % 10 == 0 or epoch == epochs - 1:
+            print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss:.4f}")
 
     return model
 
 
+
+
 from sklearn.metrics import accuracy_score, classification_report
 
-def test_model(model, feature_vectors, true_values):
-    model.eval()
-    x_test = torch.tensor(feature_vectors, dtype=torch.float32)
+from sklearn.metrics import classification_report
+
+def test_model(model, x_test, y_test):
+    # Get predictions
+    x_test = torch.tensor(x_test)
+    predictions = model(x_test)
+    predictions = (predictions >= 0.5).int()  
 
     with torch.no_grad():
-        probabilities = model(x_test)  # Get predicted probabilities
-        predictions = (probabilities >= 0.5).float().numpy().flatten()  # Convert to 0 or 1
+        outputs = model(x_test)
+        probs = torch.sigmoid(outputs)
+        print(probs)
+        predictions = (probs >= 0.5).int()  # Lower threshold → more positives predicted
 
-    true_values = np.array(true_values)
+    print(predictions)
+    # Get true values
+    true_values = y_test
 
-    # Compute Metrics
-    accuracy = accuracy_score(true_values, predictions)
-    report = classification_report(true_values, predictions, target_names=["Fully Paid", "Charged Off"])
+    # Generate the classification report
+    report = classification_report(true_values, predictions, target_names=["Fully Paid", "Charged Off"], labels=[0, 1])
+    print(report)
 
-    print(f"Model Accuracy: {accuracy:.4f}")
-    print("Classification Report:\n", report)
-
-    return {"accuracy": accuracy, "classification_report": report}
 
 
 def get_data_from_csv(csv_loc: str, feature_names: list[str], target_name: str):
@@ -104,11 +170,11 @@ def get_data_from_csv(csv_loc: str, feature_names: list[str], target_name: str):
                 continue  # Skip rows with missing values
             
             feature_vector = [float(row[i]) for i in feature_indexes]
-            loan_status = row[target_index].strip().lower()
+            loan_status = row[target_index]
 
             # Convert to binary
-            target_value = 0 if loan_status == "fully_paid" else 1  # Fully Paid = 0, Charged Off = 1
-
+            target_value = 0 if loan_status == "Fully Paid" else 1  # Fully Paid = 0, Charged Off = 1
+            # print(target_value)
             feature_vectors.append(feature_vector)
             target_values.append(target_value)
 
@@ -135,11 +201,10 @@ def preprocess_data(new_data, scaler):
 
 
 def predict_default_probability(model, new_data, scaler, threshold=0.5):
-    """Perform the prediction and give probability for data"""
     processed_data = preprocess_data(new_data, scaler)
 
     with torch.no_grad():
-        probability = model(processed_data).item()  # Get raw probability (between 0 and 1)
+        probability = model(processed_data).item()  # Now this should be between 0 and 1
 
     prediction = 1 if probability >= threshold else 0  # Thresholding at 0.5
 
@@ -147,6 +212,7 @@ def predict_default_probability(model, new_data, scaler, threshold=0.5):
     print(f"Predicted Loan Status: {'Charged Off (1)' if prediction == 1 else 'Fully Paid (0)'}")
 
     return prediction, probability
+
 
 import random
 
@@ -190,11 +256,16 @@ if __name__ == "__main__":
     # Load Data
     csv_loc = "datasets/cleaned_dataset.csv"  # CHANGE
 
-    feature_names = ["loan_amnt", "term", "annual_inc", "fico_range_low", "emp_length", "int_rate"]
-    target_name = "loan_status"  
+    # feature_names = ["loan_amnt", "annual_inc", "fico_range_low", "emp_length", "int_rate"] # loan_default_model_v2_500ep
+
+    # feature_names = ["loan_amnt", "annual_inc", "fico_range_low", "int_rate"]  # loan_default_model_v2_64
+
+    feature_names = ["annual_inc", "fico_range_low", "emp_length", "int_rate"]  # loan_default_model_v2_66
+
+    target_name = "loan_status"
 
     feature_vectors, target_values = get_data_from_csv(csv_loc, feature_names, target_name)
-
+    print(len(feature_vectors))
     # Split the data into train/test
     x_train, x_test, y_train, y_test = train_test_split(feature_vectors, target_values, test_size=0.2, stratify=target_values, random_state=42)
 
@@ -202,15 +273,22 @@ if __name__ == "__main__":
     model = LoanDefaultPredictor(input_size=len(feature_names))
 
     # Train Model
-    model = train_model(model, x_train, y_train, epochs=50)
+    model = train_model(model, x_train, y_train, epochs=120)
 
     # Save Model
     torch.save(model.state_dict(), "models/loan_default_model_v2.pth")
 
     # Evaluate Model
     # If already saved
-    # model.load_state_dict(torch.load("models/loan_default_model.pth"))
+    # model.load_state_dict(torch.load("models/loan_default_model_v2.pth"))
     
     # If not saved
-    test_results = test_model(model, x_test, y_test)
-
+    test_model(model, x_test, y_test)
+    # print(test_results)
+    # for result in test_results:
+    #     print(result)
+    
+    # if all(test_results) == 1.0:
+    #     print("all are 1")
+    # if any(test_results) == 0.0:
+    #     print("at least 1 is 0.0")

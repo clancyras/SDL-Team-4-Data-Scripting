@@ -22,7 +22,7 @@ action_dict = {
 
 class ClassifierNN(nn.Module):
     def __init__(self, input_size, hidden_size=32, num_classes=4):
-        super(ClassifierNN, self).__init__()\
+        super(ClassifierNN, self).__init__()
         
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.relu = nn.ReLU()
@@ -52,7 +52,7 @@ def get_data_from_csv(csv_loc: str, feature_names: list[str]):
         for row in csv_reader:  # Read remaining rows
             feature_vector = []
             for feature_name_index in feature_name_indexes:
-                feature_vector.append(row[feature_name_index])
+                feature_vector.append(float(row[feature_name_index]))
             
             if ' ' in feature_vector:
                 continue
@@ -66,11 +66,11 @@ def get_data_from_csv(csv_loc: str, feature_names: list[str]):
 
 def train(model, feature_vectors, actions):
     # Dataset
-    x_train = torch.tensor(feature_vectors)
-    y_train = torch.tensor(actions)
+    x_train = torch.tensor(feature_vectors, dtype=torch.float32)
+    y_train = torch.tensor(actions, dtype=torch.long)
 
     # Convert to DataLoader
-    batch_size = 8
+    batch_size = 256
     dataset = TensorDataset(x_train, y_train)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
@@ -100,12 +100,12 @@ def train(model, feature_vectors, actions):
     optimizer = optim.Adam(model.parameters(), lr=0.01)
 
     # Training loop
-    num_epochs = 100
+    num_epochs = 500
     for epoch in range(num_epochs):
         for inputs, labels in dataloader:
             optimizer.zero_grad()
             outputs = model(inputs)
-            outputs = outputs.squeeze(1)
+            # outputs = outputs.squeeze(1)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -182,14 +182,16 @@ def balance_classes(feature_vectors, actions, target_size=None):
     print("New balanced class distribution:", Counter(balanced_labels))
     return np.array(balanced_features), np.array(balanced_labels)
 
-
+from sklearn.model_selection import train_test_split
 if __name__ == '__main__':
     csv_loc = 'datasets/cleaned_dataset.csv'
-    feature_vectors, actions = get_data_from_csv(csv_loc, ["loan_amnt", "term", "annual_inc", "fico_range_low", "emp_length", "int_rate"])
-    feature_vectors, actions = balance_classes(feature_vectors, actions)
-
+    feature_vectors, actions = get_data_from_csv(csv_loc, ["loan_amnt", "term", "fico_range_low", "int_rate"])
+    # feature_vectors, actions = balance_classes(feature_vectors, actions)
+    print(len(feature_vectors))
     from sklearn.preprocessing import StandardScaler
     scaler = StandardScaler()
+    feature_vectors = np.array(feature_vectors, dtype=np.float32)
+    actions = np.array(actions, dtype=np.int64)
     feature_vectors = scaler.fit_transform(feature_vectors)
     
     # Testing scaler to see if any improvements
@@ -197,22 +199,34 @@ if __name__ == '__main__':
     with open("models/loan_classification_scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
 
-    feature_vectors_train = np.array(feature_vectors[:100000], np.float32)
-    actions_train = np.array(actions[:100000], np.long)
-
+    
     
 
-    feature_vectors_test = np.array(feature_vectors[100000:110000], np.float32)
-    actions_test = np.array(actions[100000:110000], np.float32)
+    # Perform stratified split (optional, but useful for classification tasks)
+    feature_vectors_train, feature_vectors_test, actions_train, actions_test = train_test_split(
+        feature_vectors,
+        actions,
+        test_size=0.1,  # 10% for testing
+        random_state=42,  # For reproducibility
+        stratify=actions  # Ensures label distribution is preserved
+    )
+    print(len(feature_vectors_test))
+    # feature_vectors_train = np.array(feature_vectors[:100000], np.float32)
 
-    model = ClassifierNN(6)
+    # actions_train = np.array(actions[:100000], np.int64)
+    # actions_test = np.array(actions[100000:110000], np.int64)
+
+    # feature_vectors_test = np.array(feature_vectors[100000:110000], np.float32)
+
+    model = ClassifierNN(4)
 
     # Train
-    # model = train(model, feature_vectors_train, actions_train)
-    # torch.save(model.state_dict(), "models/V1.pth")
+    model = train(model, feature_vectors_train, actions_train)
+    torch.save(model.state_dict(), "models/loan_class.pth")
 
     # Test
-    model.load_state_dict(torch.load("models/V1.pth"))
+    model = ClassifierNN(4)
+    model.load_state_dict(torch.load("models/loan_class.pth"))
 
     result = test_classification_model(model, feature_vectors_test, actions_test)
 
