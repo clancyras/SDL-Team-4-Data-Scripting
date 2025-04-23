@@ -20,9 +20,9 @@ action_dict = {
     # "house": 9,
 }
 
-class ClassifierNN(nn.Module):
+class LoanClassifierNN(nn.Module):
     def __init__(self, input_size, hidden_size=32, num_classes=4):
-        super(ClassifierNN, self).__init__()
+        super(LoanClassifierNN, self).__init__()
         
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.relu = nn.ReLU()
@@ -36,6 +36,12 @@ class ClassifierNN(nn.Module):
         x = self.relu(x)
         x = self.fc3(x)  
         return x
+
+    def process_output(output, y_scaler):
+        """Process output from model and return confidence (y_scaler not needed)"""
+        output = torch.argmax(torch.softmax(output, dim=1), dim=1).numpy()
+        
+        return output, 0.687
 
 
 def get_data_from_csv(csv_loc: str, feature_names: list[str]):
@@ -51,11 +57,12 @@ def get_data_from_csv(csv_loc: str, feature_names: list[str]):
         action_index = header.index('purpose')
         for row in csv_reader:  # Read remaining rows
             feature_vector = []
+            if " " in row or "" in row:
+                continue
             for feature_name_index in feature_name_indexes:
                 feature_vector.append(float(row[feature_name_index]))
             
-            if ' ' in feature_vector:
-                continue
+            
             
             actions.append(action_dict.get(row[action_index], 0))
             feature_vectors.append(feature_vector)
@@ -196,7 +203,7 @@ if __name__ == '__main__':
     
     # Testing scaler to see if any improvements
     import pickle
-    with open("models/loan_classification_scaler.pkl", "wb") as f:
+    with open("models/loan_classification/x_scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
 
     

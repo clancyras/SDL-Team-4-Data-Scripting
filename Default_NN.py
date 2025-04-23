@@ -42,6 +42,11 @@ class LoanDefaultPredictor(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+    def process_output(output, y_scaler):
+        """Return the processed output and the confidence. Y_scaler is not necessary"""
+        probs = torch.sigmoid(output)
+        output = (probs >= 0.5).int()
+        return output, 0.793
 
 
 
@@ -152,7 +157,7 @@ def test_model(model, x_test, y_test):
     report = classification_report(true_values, predictions, target_names=["Fully Paid", "Charged Off"], labels=[0, 1])
     print(report)
 
-
+import joblib
 
 def get_data_from_csv(csv_loc: str, feature_names: list[str], target_name: str):
     feature_vectors = []
@@ -184,6 +189,8 @@ def get_data_from_csv(csv_loc: str, feature_names: list[str], target_name: str):
     # Normalize
     scaler = StandardScaler()
     feature_vectors = scaler.fit_transform(feature_vectors)
+
+    joblib.dump(scaler, "models/default_pred/x_scaler.pkl")
 
     return feature_vectors, target_values
 

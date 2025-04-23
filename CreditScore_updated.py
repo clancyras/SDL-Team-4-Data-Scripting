@@ -13,9 +13,9 @@ print("Using device:", device)
 
 
 # ======================== MODEL ========================
-class DeepRegressor(nn.Module):
+class CreditScore(nn.Module):
     def __init__(self, input_size):
-        super(DeepRegressor, self).__init__()
+        super(CreditScore, self).__init__()
         self.net = nn.Sequential(
             nn.Linear(input_size, 128),
             nn.BatchNorm1d(128),
@@ -29,7 +29,18 @@ class DeepRegressor(nn.Module):
         )
 
     def forward(self, x):
+        """Run the model (progress the various layers)"""
         return self.net(x)
+    
+    def process_output(output, y_scaler):
+        """Process the output accordingly (y_scaler needed)"""
+        output = output.cpu().numpy().flatten()
+        
+        output = y_scaler.inverse_transform(output.reshape(-1, 1)).flatten()
+        
+        output = np.clip(output, 300, 850)
+        
+        return output, 26.37
 
 
 # ======================== DATA ========================
