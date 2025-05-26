@@ -7,26 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
-
-# class LoanDefaultPredictor(nn.Module):
-#     def __init__(self, input_size):
-#         super(LoanDefaultPredictor, self).__init__()
-        
-#         self.fc1 = nn.Linear(input_size, 32)
-#         self.bn1 = nn.BatchNorm1d(32)  # Normalization
-#         self.relu = nn.ReLU()
-#         self.dropout1 = nn.Dropout(0.3)  # prevent overfitting
-
-#         self.fc3 = nn.Linear(32, 1)  # Single output
-
-#     def forward(self, x):
-#         x = self.fc1(x)
-#         x = self.bn1(x)
-#         x = self.relu(x)
-#         x = self.dropout1(x)
-        
-#         x = self.fc3(x) 
-#         return x
+# Model for predicting the probability of default
 class LoanDefaultPredictor(nn.Module):
     def __init__(self, input_size):
         super(LoanDefaultPredictor, self).__init__()
@@ -43,52 +24,11 @@ class LoanDefaultPredictor(nn.Module):
         return self.net(x)
 
     def process_output(output, y_scaler):
-        """Return the processed output and the confidence. Y_scaler is not necessary"""
+        """Return the processed output (probability) and the confidence. Y_scaler is not necessary"""
         probs = torch.sigmoid(output)
-        output = (probs >= 0.5).int()
-        return output, 0.793
+        return probs, 0.793
 
 
-
-
-# import time
-# def train_model(model, feature_vectors, target_values, epochs=5, batch_size=512):
-#     # Convert data to PyTorch tensors
-#     x_train = torch.tensor(feature_vectors, dtype=torch.float32)
-#     y_train = torch.tensor(target_values, dtype=torch.float32).unsqueeze(1)
-
-#     class_counts = np.bincount(target_values.astype(int))
-
-#     if class_counts[0] == 0:
-#         pos_weight_value = 1.0  
-#     else:
-#         pos_weight_value = min(class_counts[1] / class_counts[0], 5.0)
-
-#     # pos_weight = torch.tensor([5.0]).to(torch.device('cpu'))
-#     pos_weight = torch.tensor([min(class_counts[0] / class_counts[1], 20.0)])
-
-
-#     dataset = TensorDataset(x_train, y_train)
-#     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-#     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-#     optimizer = optim.Adam(model.parameters(), lr=0.0005)
-
-#     # Training Loop
-#     for epoch in range(epochs):
-#         total_loss = 0.0
-#         for inputs, labels in dataloader:
-#             optimizer.zero_grad()
-#             outputs = model(inputs)
-#             loss = criterion(outputs, labels)
-#             loss.backward()
-#             optimizer.step()
-#             total_loss += loss.item()
-
-#         if epoch % 10 == 0:
-#             print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss}")
-
-#     return model
 
 
 import torch
@@ -263,6 +203,7 @@ if __name__ == "__main__":
     # Load Data
     csv_loc = "datasets/cleaned_dataset.csv"  # CHANGE
 
+    # Couple different tests of features
     # feature_names = ["loan_amnt", "annual_inc", "fico_range_low", "emp_length", "int_rate"] # loan_default_model_v2_500ep
 
     # feature_names = ["loan_amnt", "annual_inc", "fico_range_low", "int_rate"]  # loan_default_model_v2_64
@@ -291,11 +232,4 @@ if __name__ == "__main__":
     
     # If not saved
     test_model(model, x_test, y_test)
-    # print(test_results)
-    # for result in test_results:
-    #     print(result)
-    
-    # if all(test_results) == 1.0:
-    #     print("all are 1")
-    # if any(test_results) == 0.0:
-    #     print("at least 1 is 0.0")
+

@@ -12,7 +12,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
 
-# ======================== MODEL ========================
+# Regressor to predict credit score
 class CreditScore(nn.Module):
     def __init__(self, input_size):
         super(CreditScore, self).__init__()
@@ -43,7 +43,7 @@ class CreditScore(nn.Module):
         return output, 26.37
 
 
-# ======================== DATA ========================
+# Gather the data from csv file
 def get_data_from_csv(csv_loc: str, feature_names: list[str], target_name: str):
     feature_vectors, target_values = [], []
 
@@ -61,15 +61,17 @@ def get_data_from_csv(csv_loc: str, feature_names: list[str], target_name: str):
                 target_values.append(target)
             except ValueError:
                 continue
-
+    
+    # Must return as np arrays 
     features = np.array(feature_vectors, dtype=np.float32)
     targets = np.array(target_values, dtype=np.float32)
 
+    # Gather the values which are not empty, and apply to the features and targets
     mask = ~np.isnan(features).any(axis=1) & ~np.isnan(targets)
     return features[mask], targets[mask]
 
 
-# ======================== TRAINING ========================
+# Training function for the model
 def train_model(model, train_loader, val_loader, epochs=100, lr=0.001, patience=10):
     criterion = nn.HuberLoss(delta=10.0)
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -78,6 +80,7 @@ def train_model(model, train_loader, val_loader, epochs=100, lr=0.001, patience=
     no_improve = 0
     best_model = None
 
+    # Training loop
     for epoch in range(epochs):
         model.train()
         train_loss = 0.0
@@ -117,7 +120,7 @@ def train_model(model, train_loader, val_loader, epochs=100, lr=0.001, patience=
     return model
 
 
-# ======================== EVALUATION ========================
+# Evaluation
 def evaluate(model, x_test, y_test, y_scaler):
     model.eval()
     with torch.no_grad():
@@ -138,7 +141,7 @@ def evaluate(model, x_test, y_test, y_scaler):
     return preds
 
 import joblib
-# ======================== MAIN ========================
+# Main, ran when file is ran (training and initial testing)
 if __name__ == "__main__":
     csv_path = "datasets/cleaned_dataset.csv"
     features = ["annual_inc", "emp_length", "dti"]
@@ -181,24 +184,20 @@ if __name__ == "__main__":
     val_loader = DataLoader(TensorDataset(x_v, y_v), batch_size=32)
 
     # Init + Train Model
-    model = DeepRegressor(input_size=len(features)).to(device)
+    model = CreditScore(input_size=len(features)).to(device)
     # print("Training...")
     # model = train_model(model, train_loader, val_loader, epochs=150)
 
     # # Save
     # torch.save(model.state_dict(), "models/deep_credit_model.pth")
     
-    model.load_state_dict(torch.load("models/deep_credit_model.pth"))
+    # Can load
+    # model.load_state_dict(torch.load("models/deep_credit_model.pth"))
     
+    # Put into evaluation
     model.eval()
     with torch.no_grad():
         x_test_tensor = torch.tensor(np.array([50000, 5, 5], dtype=np.float32).reshape(1, -1), dtype=torch.float32).to("cuda")
         preds = model(x_test_tensor).cpu().numpy().flatten()
         preds = y_scaler.inverse_transform(preds.reshape(-1, 1)).flatten()
         print(preds)
-
-    
-    
-    # # Evaluate
-    # print("Testing...")
-    # evaluate(model, x_test_scaled, y_test, y_scaler)
