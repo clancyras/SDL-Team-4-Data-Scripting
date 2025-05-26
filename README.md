@@ -6,9 +6,13 @@ There are 'ghost' folders for both the datasets and the images created. These ar
 # Models
 
 Predict Credit Score - CreditScore_updated.py
+
 Predict Probability of Default - Default_NN.py
+
 Predict Loan Amount - loan_amnt.py
+
 Predict Loan Term - loan_term.py
+
 Predict Type of Loan - LoanClassification.py
 
 
